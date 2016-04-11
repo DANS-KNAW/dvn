@@ -52,7 +52,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter; 
 import java.io.BufferedReader; 
-import java.io.InputStreamReader; 
+import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.Timestamp;
@@ -84,6 +84,9 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
+
+import net.handle.hdllib.HandleException;
+import nl.knaw.dans.dataverse.DeletedStudy;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 
@@ -317,21 +320,98 @@ public class StudyServiceBean implements edu.harvard.iq.dvn.core.study.StudyServ
 
 
     public void deleteStudy(Long studyId, boolean deleteFromIndex) {
-        long start = new Date().getTime();
+        long start = new Date().getTime(); // intended for println's that measure performance
         //System.out.println("DEBUG: 0\t - deleteStudy - BEGIN");
         Study study = em.find(Study.class, studyId);
         if (study == null) {
             return;
         }
+
+        try {
+            redirectPersistentId(study);
+        } catch (HandleException e) {
+            logger.log(Level.SEVERE,"Study not deleted, could not redirect persistent identifier to new DeletedStudy",e);
+            return;
+        }
+        removeStudyFromLists(study);
+        removeFilesFromStudy(study);
+
+        // remove from HarvestStudy table
+        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete from HarvestStudy");
+        harvestStudyService.markHarvestStudiesAsRemoved( harvestStudyService.findHarvestStudiesByGlobalId( study.getGlobalId() ), new Date() );
+
+        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete from DB");
+        em.remove(study);
+
+        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete from Index");
+        if (deleteFromIndex) {
+            indexService.deleteStudy(studyId);
+        }
+
+        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - right before flush");
+        em.flush();  // Force study deletion to the database, for cases when we are calling this before deleting the owning Dataverse
+        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - FINISH");
+        logger.log(Level.INFO, "Successfully deleted Study " + studyId + "!");
+    }
+
+    private void redirectPersistentId(Study study) throws HandleException {
+        // TODO don't abuse HandleException for everything
+        String handle = "???"; // TODO how to get the handle?
+        if (!study.getProtocol().equals("hdl") || gnrsService.isHandleRegistered(handle)) {
+            createDeletedStudy(study);
+        }
+        if (study.getProtocol().equals("doi")){
+            HashMap metadata = doiEZIdServiceLocal.getIdentifierMetadata(study);
+            if (metadata==null)
+                throw new HandleException(-1,"Could not retrieve metadata for DOI replacement, details in the logging");
+            // TODO why has/does doiEZIdServiceLocal its own study.getEZIdURL()
+            // TODO add deleteReason, deleteRequestor, deleteTime, deleteAgreements?
+            doiEZIdServiceLocal.modifyIdentifier(study, metadata);
+        } else if (study.getProtocol().equals("hdl")){
+            if ( !gnrsService.isHandleRegistered(handle))
+                gnrsService.delete(study.getAuthority(), study.getStudyId());
+            else gnrsService.modifyHandleValue(handle); // TODO need something else
+        }
+    }
+
+    private void createDeletedStudy(Study study) {
+        // TODO it might exist because of a retry after a failing redirect
+        DeletedStudy deletedStudy = new DeletedStudy();
+        deletedStudy.setProtocol(study.getProtocol());
+        deletedStudy.setAuthority(study.getAuthority());
+        deletedStudy.setId(study.getId());
+        deletedStudy.setOwner(study.getOwner());
+        // TODO deleteReason, deleteRequestor, deleteTime, deleteAgreements
+        em.persist(deletedStudy); // TODO detect failure? Need a lock?
+    }
+
+    private void removeFilesFromStudy(Study study) {
+        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete physical files");
+        File studyDir = new File(FileUtil.getStudyFileDir() + File.separator + study.getAuthority() + File.separator + study.getStudyId());
+        if (studyDir.exists()) {
+            File[] files = studyDir.listFiles();
+            if (files != null) {
+                for (int i = 0; i < files.length; i++) {
+                    files[i].delete();
+                }
+            }
+            studyDir.delete();
+        }
+    }
+
+    private void removeStudyFromLists(Study study) {
         //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - remove from collections");
         for (Iterator<VDCCollection> it = study.getStudyColls().iterator(); it.hasNext();) {
             VDCCollection elem = it.next();
             elem.getStudies().remove(study);
 
         }
+
+        // TODO method name does not reflect deleting data variables, but can we change execution order?
         //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete data variables");
         studyService.deleteDataVariables(study.getId());
-        //force cascade delete of 
+
+        //force cascade delete of
         deleteGuestBookResponses(study.getId());
 
         //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete relationships");
@@ -344,47 +424,6 @@ public class StudyServiceBean implements edu.harvard.iq.dvn.core.study.StudyServ
             elem.getAllowedUsers().clear();
             elem.clearData();
         }
-
-        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete physical files");
-        File studyDir = new File(FileUtil.getStudyFileDir() + File.separator + study.getAuthority() + File.separator + study.getStudyId());
-        if (studyDir.exists()) {
-            File[] files = studyDir.listFiles();
-            if (files != null) {
-                for (int i = 0; i < files.length; i++) {
-                    files[i].delete();
-
-                }
-            }
-            studyDir.delete();
-        }
-
-
-        // remove from HarvestStudy table
-        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete from HarvestStudy");
-        harvestStudyService.markHarvestStudiesAsRemoved( harvestStudyService.findHarvestStudiesByGlobalId( study.getGlobalId() ), new Date() );
-
-        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete from DB and gnrs");
-        em.remove(study);
-        
-        //ADD DOI logic
-        if (study.getProtocol().equals("hdl")){
-             gnrsService.delete(study.getAuthority(), study.getStudyId());
-        }
-        if (study.getProtocol().equals("doi")){
-            doiEZIdServiceLocal.deleteIdentifier(study);
-        }
-
-        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - delete from Index");
-        if (deleteFromIndex) {
-            indexService.deleteStudy(studyId);
-        }
-
-        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - right before flush");
-        em.flush();  // Force study deletion to the database, for cases when we are calling this before deleting the owning Dataverse
-        //System.out.println("DEBUG: " + (new Date().getTime() - start) + "\t - deleteStudy - FINISH");
-        logger.log(Level.INFO, "Successfully deleted Study " + studyId + "!");
-
-
     }
 
     public void destroyWorkingCopyVersion(Long studyVersionId) {

@@ -19,6 +19,8 @@
 */
 package edu.harvard.iq.dvn.core.gnrs;
 
+import net.handle.hdllib.HandleException;
+
 import javax.ejb.Local;
 
 
@@ -42,6 +44,8 @@ public interface GNRSServiceLocal  extends java.io.Serializable {
      * @param handle a handle
      */
     public void fixHandle(String handle);
+
+    public void modifyHandleValue(String handle) throws HandleException;
 
     public void registerAll();
     
