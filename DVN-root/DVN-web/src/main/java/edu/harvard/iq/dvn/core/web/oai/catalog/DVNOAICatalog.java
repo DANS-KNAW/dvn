@@ -468,41 +468,7 @@ public class DVNOAICatalog extends AbstractCatalog implements java.io.Serializab
             File studyFileDir = FileUtil.getStudyFileDir(authority, studyId);
             String exportFileName = studyFileDir.getAbsolutePath() + File.separator + "export_" + metadataPrefix + ".xml";
             nativeItem += readFile(new File(exportFileName));          
-        } 
-        
-        
-        /*
-        Study study = studyService.getStudyByGlobalId(identifier);
-        String nativeItem = null;
-        if (study != null) {
-            String identifierElement = "<identifier>" + study.getGlobalId() + "</identifier>";
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-            String dateStamp = "<datestamp>" + sdf.format(study.getLastExportTime()) + "</datestamp>";
-            String setSpec = "<setSpec>" + study.getAuthority() + "</setSpec>";
-            Date lastUpdateTime = study.getLastUpdateTime();
-            File studyFileDir = FileUtil.getStudyFileDir(study);
-            String exportFileName = studyFileDir.getAbsolutePath() + File.separator + "export_" + metadataPrefix + ".xml";
-            String record = identifierElement + dateStamp + setSpec + readFile(new File(exportFileName));
-            nativeItem = record;
-            if (nativeItem == null) {
-                throw new IdDoesNotExistException(identifier);
-            }
-        } else {
-            DeletedStudy deletedStudy = studyService.getDeletedStudyByGlobalId(identifier);
-            if (deletedStudy != null) {
-                String deleteStatus = "<header status=\"deleted\" />";
-                String identifierElement = "<identifier>" + identifier + "</identifier>";
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-                if (deletedStudy.getDeletedTime() != null) {
-                    String dateStamp = "<datestamp>" + sdf.format(deletedStudy.getDeletedTime()) + "</datestamp>";
-                    String record = deleteStatus + identifierElement + dateStamp + deleteStatus;
-                    nativeItem = record;
-                } else {
-                    logger.severe("Deleted time is a mandatory field for deleted study " + deletedStudy.getGlobalId());
-                }
-            }
         }
-        */
         
         /***********************************************************************
          * END OF CUSTOM CODE SECTION

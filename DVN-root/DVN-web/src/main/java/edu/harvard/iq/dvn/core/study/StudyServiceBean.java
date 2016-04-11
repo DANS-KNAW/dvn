@@ -1267,34 +1267,8 @@ public class StudyServiceBean implements edu.harvard.iq.dvn.core.study.StudyServ
 
         logger2.info("Begin Exporting Studies");
         int studyCount = 0;
-        int deletedStudyCount = 0;
         try {
 
-            /* THIS IS LEGACY CODE AND SHOULD BE DELETED
-            // For all studies that have been deleted in the dataverse since last export, remove study directory in VDC
-
-            String query = "SELECT s from DeletedStudy s where s.authority = '" + authority + "' ";
-            List deletedStudies = em.createQuery(query).getResultList();
-            for (Iterator it = deletedStudies.iterator(); it.hasNext();) {
-                DeletedStudy deletedStudy = (DeletedStudy) it.next();
-
-                logger.info("Deleting study " + deletedStudy.getGlobalId());
-                Study study = em.find(Study.class, deletedStudy.getId());
-                File legacyStudyDir = new File(FileUtil.getLegacyFileDir() + File.separatorChar + study.getAuthority() + File.separatorChar + study.getStudyId());
-
-                // Remove files in the directory, then delete the directory.
-                File[] studyFiles = legacyStudyDir.listFiles();
-                if (studyFiles != null) {
-                    for (int i = 0; i < studyFiles.length; i++) {
-                        studyFiles[i].delete();
-                    }
-                }
-                legacyStudyDir.delete();
-                deletedStudyCount++;
-
-                em.remove(deletedStudy);
-            }
-            */
 
             // Do export of all studies updated at "lastUpdateTime""
 
@@ -1344,49 +1318,12 @@ public class StudyServiceBean implements edu.harvard.iq.dvn.core.study.StudyServ
             logger2.severe(stackTrace);
         }
 
-        logger2.info("End export, " + studyCount + " studies successfully exported, " + deletedStudyCount + " studies deleted.");
+        logger2.info("End export, " + studyCount + " studies successfully exported.");
     }
 
     private void exportStudyToLegacySystem(Study study, String authority) throws IOException, JAXBException {
 
         throw new EJBException("This feature is no longer supported!!");
-    /*
-    // For each study
-    // update study file locations for legacy system
-    // Write ddi to an output stream
-    // If data file dir exists, delete everything from it
-    // copy ddi to study.xml,
-    // copy study files.
-    File studyDir = new File(FileUtil.getStudyFileDir() + File.separatorChar + authority + File.separatorChar + study.getStudyId());
-    File legacyStudyDir = new File(FileUtil.getLegacyFileDir() + File.separatorChar + authority + File.separatorChar + study.getStudyId());
-
-    // If the directory exists in the legacy system, then clear out all the files contained in it
-    if (legacyStudyDir.exists() && legacyStudyDir.isDirectory()) {
-    File[] files = legacyStudyDir.listFiles();
-    for (int i = 0; i < files.length; i++) {
-    files[i].delete();
-    }
-    } else {
-    legacyStudyDir.mkdirs();
-    }
-
-    // Export the study to study.xml in the legacy directory
-    FileWriter fileWriter = new FileWriter(new File(legacyStudyDir, "study.xml"));
-    try {
-    ddiService.exportStudy(study, fileWriter, true, true);
-    fileWriter.flush();
-    } finally {
-    fileWriter.close();
-    }
-
-    // Copy all the study files to the legacy directory
-
-    for (Iterator it = study.getStudyFiles().iterator(); it.hasNext();) {
-    StudyFile studyFile = (StudyFile) it.next();
-    FileUtil.copyFile(new File(studyDir, studyFile.getFileSystemName()), new File(legacyStudyDir, studyFile.getFileSystemName()));
-    }
-     */
-
     }
 
     public String generateFileSystemNameSequence() {
