@@ -32,6 +32,7 @@ import edu.harvard.iq.dvn.core.study.StudyServiceLocal;
 import edu.harvard.iq.dvn.core.vdc.*;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.UnsupportedEncodingException;
 import java.security.PrivateKey;
 import java.util.Iterator;
 import java.util.List;
@@ -173,6 +174,66 @@ public class GNRSServiceBean implements edu.harvard.iq.dvn.core.gnrs.GNRSService
            
            createHandle(handle);
        }
+    }
+
+    public void modifyHandleValue( String handle) throws HandleException {
+
+        /* TODO how does this change the URL to a DeletedStudy?
+         *  It looks like the REBUILD comment of the original method gets closer to what happens
+         **/
+        if (!isHandleRegistered(handle)) {
+            // as the handle did not exist we don't need to persist it
+            return;
+        }
+
+        String prefix = handle.substring(0, handle.indexOf("/"));
+        String urlStr = getUrlStr(prefix, handle);
+        String authHandle = getAuthHandle();
+        byte[] urlStrBytes, authHandleBytes, handleBytes;
+        try {
+            authHandleBytes = authHandle.getBytes("UTF8");
+            urlStrBytes = urlStr.getBytes("UTF8");
+            handleBytes = handle.getBytes("UTF8");
+        } catch (UnsupportedEncodingException e) {
+            // would only happen on an OS that does not support UTF8
+            throw new HandleException(HandleException.INTERNAL_ERROR, e.getMessage());
+        }
+        String adminCredFile = System.getProperty("dvn.handle.admcredfile");
+        byte[] key = readKey(adminCredFile);
+
+        PrivateKey privKey = readPrivKey(key, adminCredFile);
+
+        HandleResolver resolver = new HandleResolver();
+
+        PublicKeyAuthenticationInfo auth =
+                new PublicKeyAuthenticationInfo(authHandleBytes, 300, privKey);
+
+        AdminRecord admin = new AdminRecord(authHandleBytes, 300,
+                true, true, true, true, true, true,
+                true, true, true, true, true, true);
+
+        int timestamp = (int) (System.currentTimeMillis() / 1000);
+
+        HandleValue adminHandleValue = new HandleValue(100, "HS_ADMIN".getBytes(),
+                Encoder.encodeAdminRecord(admin),
+                HandleValue.TTL_TYPE_RELATIVE, 86400,
+                timestamp, null, true, true, true, false);
+        HandleValue urlHandleValue = new HandleValue(1, "URL".getBytes(),
+                urlStrBytes,
+                HandleValue.TTL_TYPE_RELATIVE, 86400,
+                timestamp, null, true, true, true, false);
+        HandleValue[] val = {adminHandleValue, urlHandleValue};
+
+        ModifyValueRequest req = new ModifyValueRequest(handleBytes, val, auth);
+
+        resolver.traceMessages = true;
+        AbstractResponse response = resolver.processRequest(req);
+        if (response.responseCode == AbstractMessage.RC_SUCCESS) {
+            logger.fine("\nGot Response: \n" + response);
+        } else {
+            logger.fine("\nGot Error: \n" + response);
+            throw new HandleException(-1,"Modifying HandleValue [" + handle + "] failed: "+response.toString());
+        }
     }
 
    public void createHandle( String handle){

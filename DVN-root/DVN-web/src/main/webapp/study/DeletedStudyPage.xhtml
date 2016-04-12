@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:ui="http://java.sun.com/jsf/facelets"
+      xmlns:h="http://java.sun.com/jsf/html"
+      xmlns:f="http://java.sun.com/jsf/core"
+      xmlns:ice="http://www.icesoft.com/icefaces/component">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  </head>
+
+<body>
+  <ui:composition template="/template_study.xhtml">
+    <ui:param name="pageTitle" value="#{studyPage.studyUI.metadata.title} - #{VDCRequest.dataversePageTitle}"/>
+    <ui:define name="metadata">
+        <f:metadata>
+            <f:viewParam name="studyId" value="#{studyPage.studyId}"/>
+            <f:viewParam name="globalId" value="#{studyPage.globalId}"/>
+            <f:viewParam name="versionNumber" value="#{studyPage.versionNumber}"/>
+            <f:viewParam name="tab" value="#{studyPage.tab}"/>
+            <f:viewParam name="studyListingIndex" value="#{VDCRequest.studyListingIndex}"/>          
+            <f:event type="preRenderView" listener="#{studyPage.preRenderView}" />
+        </f:metadata>
+    </ui:define>     
+    <ui:define name="body">
+       <script type="text/javascript">
+                    // <![CDATA[
+                    function toggleMoreInfo(moreInfo) {
+                        jQuery(moreInfo).next().slideToggle(500);
+                        var toggleLabelText = (jQuery(moreInfo).children('span.iceOutTxt').text() == 'View Data Citation [+]') ? 'Collapse Data Citation [-]' : 'View Data Citation [+]';
+                        jQuery(moreInfo).children('span.iceOutTxt').text(toggleLabelText);
+                        return false;
+                    };
+
+                    function toggleTermsofUse(termsofUse) {
+                        jQuery(termsofUse).next().slideToggle(500);
+                        var toggleLabelText = (jQuery(termsofUse).children('span.iceOutTxt').text() == 'View Terms of Use [+]') ? 'Collapse Terms of Use [-]' : 'View Terms of Use [+]';
+                        jQuery(termsofUse).children('span.iceOutTxt').text(toggleLabelText);
+                        return false;
+                    };
+
+                    function getElementsByClassName( strClassName, obj ) {
+                        var ar = arguments[2] || new Array();
+                        var re = new RegExp("\\b" + strClassName + "\\b", "g");
+                        if ( re.test(obj.className) ) {
+                            ar.push( obj );
+                        }
+                        for ( var i = 0; i < obj.childNodes.length; i++ )
+                            getElementsByClassName( strClassName, obj.childNodes[i], ar );
+                        return ar;
+                    }
+
+                    function toggleCheckBoxes( elem ) {
+                        var catCBs = getElementsByClassName("catCheckBox", document.body);
+                        var studyCBs = getElementsByClassName("studyCheckBox", document.body);
+                        var fileCBs = getElementsByClassName("fileCheckBox", document.body);
+
+                        if (elem.id.indexOf('fileCheckBox') > -1) {
+                            if (!elem.checked) {
+                                fileCatIndex = findCatIndex(elem.id);
+                                // deselect corresponding catCheckBox and studyCheckBox
+                                for (var i = 0; i < catCBs.length; i++) {
+                                    if ( fileCatIndex == findCatIndex(catCBs[i].id) )  {
+                                        catCBs[i].checked = elem.checked;
+                                    }
+                                }
+                                for (var i = 0; i < studyCBs.length; i++) {
+                                    studyCBs[i].checked = elem.checked;
+                                }
+                            }
+                        } else if (elem.id.indexOf('catCheckBox') > -1) {
+                            catIndex = findCatIndex(elem.id);
+                            for (var i = 0; i < fileCBs.length; i++) {
+                                if ( !fileCBs[i].disabled && catIndex == findCatIndex(fileCBs[i].id)  )  {
+                                    fileCBs[i].checked = elem.checked;
+                                }
+                            }
+                            if (!elem.checked) {
+                                // deselect studyCheckBox
+                                for (var i = 0; i < studyCBs.length; i++) {
+                                    studyCBs[i].checked = elem.checked;
+                                }
+                            }
+
+                        } else if (elem.id.indexOf('studyCheckBox') > -1) {
+                            for (var i = 0; i < catCBs.length; i++) {
+                                if ( !catCBs[i].disabled ) {
+                                    catCBs[i].checked = elem.checked;
+                                }
+                            }
+                            for (var i = 0; i < fileCBs.length; i++) {
+                                if ( !fileCBs[i].disabled ) {
+                                    fileCBs[i].checked = elem.checked;
+                                }
+                            }
+                        }
+                        if (elem.checked) {
+                             jQuery('input[id$=downloadAllButton]').prop("disabled", false);
+                        } else {
+                            checkDownloadAllButton();
+                        }
+
+                    }
+
+                    function checkDownloadAllButton() {
+                        var fileCBs = getElementsByClassName("fileCheckBox", document.body);
+                        var anySelected = false;
+
+                        for (var i = 0; i < fileCBs.length; i++) {
+                            if ( fileCBs[i].checked )  {
+                                anySelected = true;
+                            }
+                        }
+
+                        if (anySelected) {
+                            jQuery('input[id$=downloadAllButton]').prop("disabled", false);
+                            return false;
+                        } else {
+                            jQuery('input[id$=downloadAllButton]').prop("disabled", true);
+                            return true;
+                        }
+                    }
+
+                    function findCatIndex(id) {
+                        startIndex = id.indexOf("catDataTable:") + 13;
+                        endIndex = id.indexOf(":", startIndex);
+                        return id.substring(startIndex, endIndex);
+                    }
+
+
+
+                    function viewStudyVersionDifferences() {
+                        var versionNumberStr = "";
+                        var checkedCount = 0;
+                        var versionCBs = getElementsByClassName("versionCheckBox", document.body);
+                        for (var i = 0; i < versionCBs.length; i++) {
+                            if ( versionCBs[i].checked ) {
+                                if (versionNumberStr != "") {
+                                    versionNumberStr = versionNumberStr + ",";
+                                }
+                                versionNumberStr = versionNumberStr + versionCBs[i].previousSibling.value;
+                                checkedCount++;
+                            }
+                        }
+                        if (checkedCount != 2) {
+                            alert ("You must select exactly two versions to see the differences.");
+                            return false;
+                        }
+                        window.location.href = "/dvn#{VDCRequest.currentVDCURL}/faces/study/StudyVersionDifferencesPage.xhtml?studyId=#{studyPage.studyUI.study.id}&versionNumberList=" + versionNumberStr + "&versionNumber=#{studyPage.studyUI.studyVersion.versionNumber}" + "&selectedTab=versions";
+
+                        return false;
+                    }
+
+                    function downloadSingleFile(fileDropdown) {
+                        downloadUrl = fileDropdown.options[ fileDropdown.selectedIndex ].value;
+                        fileDropdown.selectedIndex = 0;
+                        if (downloadUrl != "") {
+                            downloadFile(downloadUrl + "&versionNumber=#{studyPage.studyUI.studyVersion.versionNumber}");
+                        }
+                    }
+
+                    function downloadSelectedFiles() {
+                        jQuery('input[id$=hiddenDownloadButton]').click();
+                    }
+                    
+                    function checkTermsOfUse() {
+                        if (doDownload()) {
+                            window.location.href = "/dvn#{VDCRequest.currentVDCURL}/faces/study/StudyPage.xhtml?studyId=#{studyPage.studyUI.study.id}&versionNumber=#{studyPage.studyUI.studyVersion.versionNumber}" + "&checkTermsOfUse=true&cid=#{javax.enterprise.context.conversation.id}";
+                        } 
+                    }
+                    
+                    // this method will either download a single zip or create links for multiple zip files in the popup
+                    // if multiple links are created, it returns true, to signify to calling methods that the popup needs to be displayed
+                    function doDownload() {                  
+                        var fileNumber = 100; // set file number to 100 files
+                        var zipFileSize = 524288000; // set zip file size to 500MB
+                        //var fileNumber = 5; 
+                        //var zipFileSize = 1048576;
+
+                        var fileSize =0;
+                        var j = 0;
+                        var numb = 0;
+                        var fileIdStr = ""
+                        var bSingleZipfile= true;
+                        var fileCBs = getElementsByClassName("fileCheckBox", document.body);
+                        var popBodyContent="";
+                        
+                        var lastCheckedIndex = 0;
+                        for (var i = 0; i < fileCBs.length; i++) {
+                            if ( fileCBs[i].checked ) lastCheckedIndex = i;
+                        }
+                        
+                        for (var i = 0; i < fileCBs.length; i++) {
+                            if ( fileCBs[i].checked ) {
+                                if (j < fileNumber) {
+                                    if (fileIdStr != "") {
+                                        fileIdStr = fileIdStr + ",";
+                                    }
+                                    j++;
+                                    fileSize+= parseInt(fileCBs[i].previousSibling.previousSibling.value);
+                                    if (fileSize >= zipFileSize) {
+                                        bSingleZipfile = false;
+                                        if (fileIdStr != "") numb++;
+                                        popBodyContent+= attachToPopBodyContent(fileIdStr, numb);
+                                        j = 1;
+                                        fileSize = parseInt(fileCBs[i].previousSibling.previousSibling.value);
+                                        fileIdStr = fileCBs[i].previousSibling.value;
+                                        if (i == lastCheckedIndex) {
+                                            numb++;
+                                            popBodyContent+= attachToPopBodyContent(fileIdStr, numb);
+                                            break;
+                                        }
+                                    }
+                                    else
+                                        fileIdStr = fileIdStr + fileCBs[i].previousSibling.value;
+                                    if (i == lastCheckedIndex) {
+                                        numb++;
+                                        popBodyContent+= attachToPopBodyContent(fileIdStr, numb);
+                                        break;
+                                    }
+                                }
+                                else {
+                                    bSingleZipfile = false;
+                                    numb++;
+                                    popBodyContent+= attachToPopBodyContent(fileIdStr, numb);
+                                    j = 1;
+                                    fileSize= 0;
+                                    fileIdStr = fileCBs[i].previousSibling.value;
+                                    if (i == lastCheckedIndex) {
+                                        numb++;
+                                        popBodyContent+= attachToPopBodyContent(fileIdStr, numb);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if (fileIdStr == "") {
+                            alert ("No files selected");
+                            return false;
+                        
+                        }
+                        
+                        if (bSingleZipfile) {
+                            downloadFile("/FileDownload/study_#{studyPage.studyUI.study.studyId}.zip?fileId=" + fileIdStr + "&versionNumber=#{studyPage.studyUI.studyVersion.versionNumber}" + "#{studyPage.xff}");
+                            return false;
+                        } else {
+                            jQuery('table[id$=autoCentZipContent] #dvnMultipleZipPopupScrollBox').append(popBodyContent).after("<br/><span class='iceOutTxt'>Total Number of ZIP Archives: " + numb + "</span>");
+                            return true;
+                        }
+                    }
+                    
+                    function attachToPopBodyContent(fileIdStrIn, zipNumber) {
+                        if (fileIdStrIn == "") return "";
+                        if (fileIdStrIn.endsWith(",")) fileIdStrIn= fileIdStrIn.substring(0,fileIdStrIn.length-1);
+                        return "<a href='/dvn#{VDCRequest.currentVDCURL}/FileDownload/study_#{studyPage.studyUI.study.studyId}.zip?fileId=" + fileIdStrIn + "&versionNumber=#{studyPage.studyUI.studyVersion.versionNumber}" + "#{studyPage.xff}'><span class='iceOutTxt'>Download ZIP Archive "+zipNumber+ "</span></a><br/>";
+                    }
+                    
+                    function downloadFile(fileUrl) {
+                            self.location.href = "/dvn#{VDCRequest.currentVDCURL}" + fileUrl;
+                    }
+                    // ]]>
+                </script>
+      <f:loadBundle basename="StudyBundle" var="studybundle"/>
+    <ui:include src="DeletedStudyFragment.xhtml"/>
+ 
+    </ui:define>
+  </ui:composition>
+</body>
+</html>
